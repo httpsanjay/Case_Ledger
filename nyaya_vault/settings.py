@@ -90,12 +90,25 @@ WSGI_APPLICATION = 'nyaya_vault.wsgi.application'
 
 # Toggle between SQLite and PostgreSQL based on environment variables
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+
+if os.environ.get("USE_AWS_RDS") == "True":
+ DATABASES = {
+     'default' : {
+         'ENGINE' : 'django.db.backends.postgresql',
+         'NAME' : os.environ.get('AWS_RDS_NAME'),
+         'USER' : os.environ.get('AWS_RDS_USER'),
+         'PASSWORD' : os.environ.get('AWS_RDS_PASSWORD'),
+         'HOST' : os.environ.get('AWS_RDS_HOST'),
+         'PORT' : os.environ.get('AWS_RDS_PORT'),
+     }
+ }
+else:
+ DATABASES = {
+     'default': {
+         'ENGINE': 'django.db.backends.sqlite3',
+         'NAME': BASE_DIR / 'db.sqlite3',
+     }
+ }
 
 
 AUTH_USER_MODEL = "accounts.User"
