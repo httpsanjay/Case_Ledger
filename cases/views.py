@@ -51,16 +51,26 @@ from .permissions import (
     can_access_document_version,
     can_download_document_version,
 )
-from .search import serialize_search_results, unified_search
 from .rag import ask_case as rag_ask_case
 
 logger = logging.getLogger(__name__)
 
 
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.shortcuts import render
+from .search import 
+
+
 @login_required
 def search(request):
     query = request.GET.get("q", "").strip()
-    results = unified_search(query, request.user)
+
+    results = unified_search(
+        query=query,
+        user=request.user,
+    )
+
     return render(
         request,
         "cases/search.html",
@@ -74,13 +84,16 @@ def search(request):
 @login_required
 def search_api(request):
     query = request.GET.get("q", "").strip()
+
+    results = unified_search(
+        query=query,
+        user=request.user,
+    )
+
     return JsonResponse({
         "query": query,
-        "results": serialize_search_results(
-            unified_search(query, request.user)
-        ),
+        "results": serialize_search_results(results),
     })
-
 
 @login_required
 def case_ask(request, pk):

@@ -1,113 +1,45 @@
 import os
-import sys
-from pathlib import Path
 from typing import Any
 
-import django
+import httpx
 from dotenv import load_dotenv
-
-try:
-    from fastmcp import FastMCP
-    from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
-except ImportError:  # pragma: no cover - fallback for environments without the package installed
-    class StaticTokenVerifier:
-        def __init__(self, *args, **kwargs):
-            self.args = args
-            self.kwargs = kwargs
-
-    class FastMCP:
-        def __init__(self, *args, **kwargs):
-            self.args = args
-            self.kwargs = kwargs
-
-        def tool(self, *decorator_args, **decorator_kwargs):
-            def decorator(func):
-                return func
-            if decorator_args and callable(decorator_args[0]):
-                return decorator_args[0]
-            return decorator
-
-        def prompt(self, *decorator_args, **decorator_kwargs):
-            def decorator(func):
-                return func
-            if decorator_args and callable(decorator_args[0]):
-                return decorator_args[0]
-            return decorator
-from django.contrib.auth import get_user_model
-from cases.rag import ask_case as rag_ask_case
+from fastmcp import FastMCP
+from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
 
 
 # ============================================================
 # Configuration
 # ============================================================
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
-
 load_dotenv()
 
-
-# ============================================================
-# Django initialization
-# ============================================================
-
-os.environ.setdefault(
-    "DJANGO_SETTINGS_MODULE",
-    "nyaya_vault.settings",
-)
-
-django.setup()
-
-
-# Import Django models only after django.setup()
-from cases.models import (
-    Case,
-    Document,
-    DocumentVersion,
-    DocumentShare,
-)
-
-
-# ============================================================
-# Environment configuration
-# ============================================================
-
 MCP_AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN")
+INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN")
 
 if not MCP_AUTH_TOKEN:
-    raise RuntimeError(
-        "MCP_AUTH_TOKEN is not configured."
-    )
+    raise RuntimeError("MCP_AUTH_TOKEN is not configured.")
+
+if not INTERNAL_TOKEN:
+    raise RuntimeError("INTERNAL_TOKEN is not configured.")
 
 
-MCP_HOST = os.getenv(
-    "MCP_HOST",
-    "0.0.0.0",
-)
+MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
+MCP_PORT = int(os.getenv("MCP_PORT", "8001"))
 
-MCP_PORT = int(
-    os.getenv(
-        "MCP_PORT",
-        "8001",
-    )
-)
+# Local:
+# DJANGO_URL=http://localhost:8000
+#
+# Docker:
+# DJANGO_URL=http://django:8000
+
+DJANGO_URL = os.getenv(
+    "DJANGO_URL",
+    "http://localhost:8000",
+).rstrip("/")
 
 
 # ============================================================
-# Authentication
-# ============================================================
-#
-# IMPORTANT:
-# StaticTokenVerifier is appropriate for controlled
-# service-to-service / development deployments.
-#
-# For production with real users, replace this with:
-# - JWT verification
-# - OAuth/OIDC
-# - or a custom verifier connected to your identity system.
-#
+# MCP Authentication
 # ============================================================
 
 auth = StaticTokenVerifier(
@@ -124,64 +56,109 @@ auth = StaticTokenVerifier(
 
 
 # ============================================================
-# FastMCP server
+# FastMCP Server
 # ============================================================
 
 mcp = FastMCP(
     name="NyayaVault MCP",
+
     instructions="""
-    NyayaVault MCP provides controlled access to legal and
-    investigation case information.
+NyayaVault MCP provides controlled access to legal and
+investigation case information.
 
-    Available capabilities include:
+Available capabilities:
 
-    - Searching cases
-    - Retrieving case metadata
-    - Searching documents
-    - Retrieving document metadata
-    - Listing documents associated with a case
-    - Generating structured case-analysis prompts
+- Search cases
+- Retrieve case metadata
+- Search documents
+- Retrieve document metadata
+- List documents associated with a case
+- Ask questions using authorized case information
+- Generate structured case-analysis prompts
 
-    Security rules:
+Security rules:
 
-    - Never invent case information.
-    - Never expose information not returned by a tool.
-    - Treat all case and document information as confidential.
-    - Do not bypass application-level authorization.
-    - Do not infer missing facts.
-    """,
+- Never invent case information.
+- Never expose information not returned by Django.
+- Treat all case and document information as confidential.
+- Do not bypass Django authorization.
+- Do not infer missing facts.
+- RAG retrieval and authorization are performed by Django.
+""",
+
     auth=auth,
 )
 
 
 # ============================================================
-# Helper functions
+# Django HTTP Helper
 # ============================================================
 
-def _get_mcp_rag_user():
-    User = get_user_model()
-    user_id = os.getenv("MCP_RAG_USER_ID")
-    username = os.getenv("MCP_RAG_USERNAME")
+async def django_request(
+    method: str,
+    path: str,
+    *,
+    params: dict[str, Any] | None = None,
+    json: dict[str, Any] | None = None,
+) -> dict[str, Any]:
 
-    if user_id:
-        try:
-            return User.objects.get(pk=int(user_id))
-        except (TypeError, ValueError, User.DoesNotExist):
-            pass
+    url = f"{DJANGO_URL}{path}"
 
-    if username:
-        try:
-            return User.objects.get(username=username)
-        except User.DoesNotExist:
-            pass
+    headers = {
+        "Authorization": f"Bearer {INTERNAL_TOKEN}",
+        "Accept": "application/json",
+    }
 
-    raise RuntimeError("MCP_RAG_USER_ID or MCP_RAG_USERNAME must be configured for MCP RAG access.")
+    try:
+        async with httpx.AsyncClient(
+            timeout=60.0,
+        ) as client:
 
+            response = await client.request(
+                method=method,
+                url=url,
+                params=params,
+                json=json,
+                headers=headers,
+            )
+
+        response.raise_for_status()
+
+        return response.json()
+
+    except httpx.HTTPStatusError as exc:
+
+        return {
+            "success": False,
+            "error": (
+                f"Django returned HTTP "
+                f"{exc.response.status_code}"
+            ),
+        }
+
+    except httpx.RequestError as exc:
+
+        return {
+            "success": False,
+            "error": (
+                "Unable to connect to Django: "
+                f"{exc}"
+            ),
+        }
+
+    except ValueError:
+
+        return {
+            "success": False,
+            "error": "Django returned invalid JSON.",
+        }
+
+
+# ============================================================
+# Input Validation
+# ============================================================
 
 def clean_query(query: str) -> str:
-    """
-    Normalize and validate search input.
-    """
 
     if not isinstance(query, str):
         raise ValueError("Query must be a string.")
@@ -193,12 +170,42 @@ def clean_query(query: str) -> str:
             "Search query cannot be empty."
         )
 
-    if len(query) > 200:
+    if len(query) > 500:
         raise ValueError(
             "Search query is too long."
         )
 
     return query
+
+
+def validate_id(value: int, name: str) -> int:
+
+    if not isinstance(value, int) or value <= 0:
+        raise ValueError(
+            f"{name} must be a positive integer."
+        )
+
+    return value
+
+
+def validate_top_k(top_k: int) -> int:
+
+    if not isinstance(top_k, int):
+        raise ValueError(
+            "top_k must be an integer."
+        )
+
+    if top_k <= 0:
+        raise ValueError(
+            "top_k must be positive."
+        )
+
+    if top_k > 20:
+        raise ValueError(
+            "top_k cannot be greater than 20."
+        )
+
+    return top_k
 
 
 # ============================================================
@@ -209,8 +216,8 @@ def clean_query(query: str) -> str:
     name="search_cases",
     title="Search Cases",
     description=(
-        "Search NyayaVault cases using a case number or "
-        "partial case-number query."
+        "Search NyayaVault cases using a case number "
+        "or partial case-number query."
     ),
 )
 async def search_cases(
@@ -219,95 +226,48 @@ async def search_cases(
 
     query = clean_query(query)
 
-    cases = (
-        Case.objects
-        .filter(
-            case_number__icontains=query
-        )
-        .order_by("id")[:20]
+    return await django_request(
+        "GET",
+        "/internal/mcp/cases/search/",
+        params={
+            "q": query,
+        },
     )
-
-    results = []
-
-    async for case in cases:
-        results.append({
-            "id": case.id,
-            "case_number": case.case_number,
-            "status": case.status,
-        })
-
-    return {
-        "query": query,
-        "count": len(results),
-        "results": results,
-    }
 
 
 @mcp.tool(
     name="get_case",
     title="Get Case",
     description=(
-        "Retrieve basic metadata for a NyayaVault case "
-        "using its internal case ID."
+        "Retrieve case metadata using the internal "
+        "case ID."
     ),
 )
 async def get_case(
     case_id: int,
 ) -> dict[str, Any]:
 
-    if case_id <= 0:
-        raise ValueError(
-            "case_id must be a positive integer."
-        )
+    case_id = validate_id(case_id, "case_id")
 
-    case = await (
-        Case.objects
-        .filter(id=case_id)
-        .afirst()
+    return await django_request(
+        "GET",
+        f"/internal/mcp/cases/{case_id}/",
     )
-
-    if not case:
-        return {
-            "found": False,
-            "case_id": case_id,
-            "message": "Case not found.",
-        }
-
-    return {
-        "found": True,
-        "case": {
-            "id": case.id,
-            "case_number": case.case_number,
-            "status": case.status,
-        },
-    }
 
 
 @mcp.tool(
     name="get_cases_count",
     title="Get Cases Count",
     description=(
-        "Return the total number of NyayaVault cases "
-        "across OPEN, PENDING and CLOSED states."
+        "Return the total number of NyayaVault cases."
     ),
 )
 async def get_cases_count() -> dict[str, Any]:
 
-    statuses = [
-        "OPEN",
-        "PENDING",
-        "CLOSED",
-    ]
-
-    total = await (
-        Case.objects
-        .filter(status__in=statuses)
-        .acount()
+    return await django_request(
+        "GET",
+        "/internal/mcp/cases/count/",
     )
-
-    return {
-        "total_cases": total,
-    }
 
 
 # ============================================================
@@ -327,66 +287,35 @@ async def search_documents(
 
     query = clean_query(query)
 
-    documents = (
-        Document.objects
-        .filter(
-            name__icontains=query
-        )
-        .order_by("id")[:20]
+    return await django_request(
+        "GET",
+        "/internal/mcp/documents/search/",
+        params={
+            "q": query,
+        },
     )
-
-    results = []
-
-    async for document in documents:
-        results.append({
-            "id": document.id,
-            "name": document.name,
-        })
-
-    return {
-        "query": query,
-        "count": len(results),
-        "results": results,
-    }
 
 
 @mcp.tool(
     name="get_document",
     title="Get Document",
     description=(
-        "Retrieve basic metadata for a NyayaVault "
-        "document."
+        "Retrieve metadata for a NyayaVault document."
     ),
 )
 async def get_document(
     document_id: int,
 ) -> dict[str, Any]:
 
-    if document_id <= 0:
-        raise ValueError(
-            "document_id must be a positive integer."
-        )
-
-    document = await (
-        Document.objects
-        .filter(id=document_id)
-        .afirst()
+    document_id = validate_id(
+        document_id,
+        "document_id",
     )
 
-    if not document:
-        return {
-            "found": False,
-            "document_id": document_id,
-            "message": "Document not found.",
-        }
-
-    return {
-        "found": True,
-        "document": {
-            "id": document.id,
-            "name": document.name,
-        },
-    }
+    return await django_request(
+        "GET",
+        f"/internal/mcp/documents/{document_id}/",
+    )
 
 
 @mcp.tool(
@@ -401,52 +330,28 @@ async def get_case_documents(
     case_id: int,
 ) -> dict[str, Any]:
 
-    if case_id <= 0:
-        raise ValueError(
-            "case_id must be a positive integer."
-        )
-
-    case_exists = await (
-        Case.objects
-        .filter(id=case_id)
-        .aexists()
+    case_id = validate_id(
+        case_id,
+        "case_id",
     )
 
-    if not case_exists:
-        return {
-            "found": False,
-            "case_id": case_id,
-            "message": "Case not found.",
-        }
-
-    documents = (
-        Document.objects
-        .filter(case_id=case_id)
-        .order_by("id")
+    return await django_request(
+        "GET",
+        f"/internal/mcp/cases/{case_id}/documents/",
     )
 
-    results = []
 
-    async for document in documents:
-        results.append({
-            "id": document.id,
-            "name": document.name,
-        })
-
-    return {
-        "found": True,
-        "case_id": case_id,
-        "count": len(results),
-        "documents": results,
-    }
-
+# ============================================================
+# RAG TOOL
+# ============================================================
 
 @mcp.tool(
     name="ask_case_question",
     title="Ask Case Question",
     description=(
-        "Answer a question using the authorized case scope only. "
-        "The tool enforces Django case authorization before semantic retrieval and LLM generation."
+        "Ask a question about an authorized NyayaVault "
+        "case. Django performs authorization, semantic "
+        "retrieval, and answer generation using RAG."
     ),
 )
 async def ask_case_question(
@@ -454,51 +359,24 @@ async def ask_case_question(
     question: str,
     top_k: int = 5,
 ) -> dict[str, Any]:
-    if case_id <= 0:
-        raise ValueError("case_id must be a positive integer.")
 
-    if top_k <= 0:
-        raise ValueError("top_k must be positive.")
+    case_id = validate_id(
+        case_id,
+        "case_id",
+    )
 
-    try:
-        user = _get_mcp_rag_user()
-    except RuntimeError as exc:
-        return {
-            "success": False,
-            "error": str(exc),
-        }
+    question = clean_query(question)
 
-    case = Case.objects.filter(pk=case_id).first()
-    if case is None:
-        return {
-            "success": False,
-            "error": "Case not found.",
-        }
+    top_k = validate_top_k(top_k)
 
-    if not user.is_authenticated or not user.is_active:
-        return {
-            "success": False,
-            "error": "MCP RAG user is not active.",
-        }
-
-    result = rag_ask_case(user, case_id, question, top_k=top_k)
-    if result.get("success"):
-        return {
-            "success": True,
-            "answer": result.get("answer"),
-            "sources": result.get("sources", []),
-            "case": result.get("case"),
-            "retrieved_chunks": result.get("retrieved_chunks", []),
-            "provider": result.get("provider"),
-            "model": result.get("model"),
-        }
-    return {
-        "success": False,
-        "error": result.get("error", "Unable to answer this question."),
-        "case": result.get("case"),
-        "sources": result.get("sources", []),
-        "retrieved_chunks": result.get("retrieved_chunks", []),
-    }
+    return await django_request(
+        "POST",
+        f"/internal/mcp/cases/{case_id}/ask/",
+        json={
+            "question": question,
+            "top_k": top_k,
+        },
+    )
 
 
 # ============================================================
@@ -594,7 +472,7 @@ Important constraints:
     title="Review Evidence",
     description=(
         "Generate a structured prompt for reviewing "
-        "case evidence and identifying information gaps."
+        "case evidence."
     ),
 )
 def review_evidence(
@@ -631,7 +509,7 @@ Rules:
     title="Find Contradictions",
     description=(
         "Generate a structured prompt for identifying "
-        "potential contradictions in supplied case material."
+        "potential contradictions."
     ),
 )
 def find_contradictions(
