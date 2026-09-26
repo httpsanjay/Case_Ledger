@@ -5,7 +5,7 @@ import httpx
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
-
+from rag import answer_case_question
 
 # ============================================================
 # Configuration
@@ -368,6 +368,30 @@ async def ask_case_question(
             "question": question,
             "top_k": top_k,
         },
+    )
+
+@mcp.tool(
+    name="ask_case_question",
+    title="Ask Case Question",
+    description=(
+        "Ask a question about a NyayaVault case "
+        "using RAG over its authorized documents."
+    ),
+)
+async def ask_case_question(
+    case_id: int,
+    question: str,
+    top_k: int = 5,
+) -> dict[str, Any]:
+
+    case_id = validate_id(case_id, "case_id")
+    question = clean_query(question)
+    top_k = validate_top_k(top_k)
+
+    return await answer_case_question(
+        case_id=case_id,
+        question=question,
+        top_k=top_k,
     )
 
 
