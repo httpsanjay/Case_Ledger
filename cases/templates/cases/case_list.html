@@ -886,6 +886,8 @@
 
         }
 </style>
+
+
 {% endblock %}
 <!-- =====================================================
          SIDEBAR
@@ -937,138 +939,96 @@
             </div>
 
 
-            <!-- =================================================
-                 SEARCH CARD
-            ================================================== -->
+           <!-- =================================================
+     SEARCH CARD
+================================================== -->
 
-            <div class="card">
+<div class="card">
 
+    <div class="search">
 
-                <div class="search">
+        <form method="GET">
 
+            <input
+                type="text"
+                name="q"
+                value="{{ request.GET.q|default:'' }}"
+                placeholder="Search case number, title, officer..."
+            >
 
-                    <form method="GET">
+            <select name="status">
+                <option value="">All Status</option>
 
+                <option
+                    value="OPEN"
+                    {% if request.GET.status == "OPEN" %}
+                        selected
+                    {% endif %}
+                >
+                    Open
+                </option>
 
-                        <input
-                            type="text"
-                            name="q"
-                            value="{{ request.GET.q|default:'' }}"
-                            placeholder="Search case number, title, officer..."
+                <option
+                    value="PENDING"
+                    {% if request.GET.status == "PENDING" %}
+                        selected
+                    {% endif %}
+                >
+                    Pending
+                </option>
+
+                <option
+                    value="CLOSED"
+                    {% if request.GET.status == "CLOSED" %}
+                        selected
+                    {% endif %}
+                >
+                    Closed
+                </option>
+            </select>
+
+            <select name="case_type">
+                <option value="">All Case Types</option>
+
+                {% for value, label in case_type_choices %}
+                    {% if value %}
+                        <option
+                            value="{{ value }}"
+                            {% if request.GET.case_type == value %}
+                                selected
+                            {% endif %}
                         >
+                            {{ label }}
+                        </option>
+                    {% endif %}
+                {% endfor %}
+            </select>
 
+            <input
+                type="text"
+                name="assigned_officer"
+                value="{{ request.GET.assigned_officer|default:'' }}"
+                placeholder="Officer..."
+            >
 
-                        <select name="status">
+            <button type="submit">
+                Search
+            </button>
 
-                            <option value="">
+            {% if request.GET.q or request.GET.status or request.GET.case_type or request.GET.assigned_officer %}
+                <a
+                    href="{% url 'case_list' %}"
+                    class="clear"
+                >
+                    Clear
+                </a>
+            {% endif %}
 
-                                All Status
+        </form>
 
-                            </option>
+    </div>
 
-
-                            <option
-                                value="OPEN"
-                                {% if request.GET.status == "OPEN" %}
-                                    selected
-                                {% endif %}
-                            >
-
-                                Open
-
-                            </option>
-
-
-                            <option
-                                value="PENDING"
-                                {% if request.GET.status == "PENDING" %}
-                                    selected
-                                {% endif %}
-                            >
-
-                                Pending
-
-                            </option>
-
-
-                            <option
-                                value="CLOSED"
-                                {% if request.GET.status == "CLOSED" %}
-                                    selected
-                                {% endif %}
-                            >
-
-                                Closed
-
-                            </option>
-
-                        </select>
-
-
-                        <select name="case_type">
-
-                            <option value="">
-
-                                All Case Types
-
-                            </option>
-
-
-                            {% for value, label in case_type_choices %}
-
-                                {% if value %}
-
-                                    <option
-                                        value="{{ value }}"
-                                        {% if request.GET.case_type == value %}
-                                            selected
-                                        {% endif %}
-                                    >
-
-                                        {{ label }}
-
-                                    </option>
-
-                                {% endif %}
-
-                            {% endfor %}
-
-                        </select>
-
-
-                        <input
-                            type="text"
-                            name="assigned_officer"
-                            value="{{ request.GET.assigned_officer|default:'' }}"
-                            placeholder="Officer..."
-                        >
-
-
-                        <button type="submit">
-
-                            Search
-
-                        </button>
-
-
-                        {% if request.GET.q or request.GET.status or request.GET.case_type or request.GET.assigned_officer %}
-
-                            <a
-                                href="{% url 'case_list' %}"
-                                class="clear"
-                            >
-
-                                Clear
-
-                            </a>
-
-                        {% endif %}
-
-
-                    </form>
-
-
-                </div>
+</div>
 
 
                 <!-- =================================================

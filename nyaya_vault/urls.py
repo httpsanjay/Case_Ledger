@@ -26,6 +26,8 @@ urlpatterns = [
     path("", include('accounts.urls')),
     path('cases/', include('cases.urls')),
     path('audit/', include('audit.urls')),
+    path("internal/mcp/",include("cases.mcp_urls"),
+),
 
 ]
 urlpatterns += static(

@@ -51,79 +51,14 @@ from .permissions import (
     can_access_document_version,
     can_download_document_version,
 )
-from .rag import ask_case as rag_ask_case
 
 logger = logging.getLogger(__name__)
-
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render
-from .search import 
 
 
-@login_required
-def search(request):
-    query = request.GET.get("q", "").strip()
-
-    results = unified_search(
-        query=query,
-        user=request.user,
-    )
-
-    return render(
-        request,
-        "cases/search.html",
-        {
-            "query": query,
-            "results": results,
-        },
-    )
-
-
-@login_required
-def search_api(request):
-    query = request.GET.get("q", "").strip()
-
-    results = unified_search(
-        query=query,
-        user=request.user,
-    )
-
-    return JsonResponse({
-        "query": query,
-        "results": serialize_search_results(results),
-    })
-
-@login_required
-def case_ask(request, pk):
-    case = get_object_or_404(Case, pk=pk)
-    if not can_access_case(request.user, case):
-        return JsonResponse({
-            "success": False,
-            "error": "You are not authorized to access this case.",
-        }, status=403)
-
-    if request.content_type and "application/json" in request.content_type:
-        try:
-            payload = json.loads(request.body.decode("utf-8") or "{}")
-        except (TypeError, ValueError):
-            payload = {}
-        question = str(payload.get("question", "") or "").strip()
-    else:
-        question = str(request.POST.get("question", "") or "").strip()
-
-    if not question:
-        return JsonResponse({
-            "success": False,
-            "error": "Question is required.",
-        }, status=400)
-
-    result = rag_ask_case(request.user, pk, question)
-    status = 200 if result.get("success") else 400
-    if not result.get("success") and "not authorized" in str(result.get("error", "")).lower():
-        status = 403
-    return JsonResponse(result, status=status)
 
 
 def queue_document_ocr(document_version_id):
@@ -237,12 +172,6 @@ def case_list(request):
             Q(assigned_to__username__icontains=assigned_officer) |
             Q(assigned_to__first_name__icontains=assigned_officer) |
             Q(assigned_to__last_name__icontains=assigned_officer)
-        )
-
-
-    if q and not any([status, case_type, assigned_officer]):
-        return redirect(
-            f"/cases/search/?{urlencode({'q': q})}"
         )
     # =========================================================
     # ORDERING

@@ -3,19 +3,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-
-    path(
-        "search/",
-        views.search,
-        name="search",
-    ),
-
-    path(
-        "api/search/",
-        views.search_api,
-        name="search_api",
-    ),
-
     path(
         "",
         views.case_list,
@@ -26,12 +13,6 @@ urlpatterns = [
         "create/",
         views.case_create,
         name="case_create"
-    ),
-
-    path(
-        "<int:pk>/ask/",
-        views.case_ask,
-        name="case_ask"
     ),
 
     path(
