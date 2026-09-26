@@ -14,13 +14,11 @@ from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
 load_dotenv()
 
 MCP_AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN")
-INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN")
 
 if not MCP_AUTH_TOKEN:
     raise RuntimeError("MCP_AUTH_TOKEN is not configured.")
 
-if not INTERNAL_TOKEN:
-    raise RuntimeError("INTERNAL_TOKEN is not configured.")
+
 
 
 MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
@@ -104,11 +102,6 @@ async def django_request(
 
     url = f"{DJANGO_URL}{path}"
 
-    headers = {
-        "Authorization": f"Bearer {INTERNAL_TOKEN}",
-        "Accept": "application/json",
-    }
-
     try:
         async with httpx.AsyncClient(
             timeout=60.0,
@@ -119,7 +112,6 @@ async def django_request(
                 url=url,
                 params=params,
                 json=json,
-                headers=headers,
             )
 
         response.raise_for_status()
