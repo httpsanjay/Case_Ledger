@@ -33,6 +33,59 @@ Managing these documents manually can make it difficult to track versions, verif
 
 ---
 
+
+
+
+# 🔎 SerpApi Integration
+
+NyayaVault integrates **SerpApi** to provide external legal research for authorized lawyers.
+
+Lawyers can search for:
+
+* Court judgments
+* Legal cases
+* Laws and regulations
+* Legal precedents
+
+### How it works
+
+```text
+Lawyer
+  ↓
+NyayaVault Legal Search
+  ↓
+SerpApi
+  ↓
+Google India
+  ↓
+Search Results
+```
+
+Search results including the **title, source, URL, and snippet** are displayed directly inside NyayaVault.
+
+### Implementation
+
+```python
+result = client.search({
+    "q": search_query,
+    "location": "India",
+    "hl": "en",
+    "gl": "in",
+    "google_domain": "google.co.in",
+})
+
+results = result.get("organic_results", [])
+```
+
+The SerpApi key is securely stored using an environment variable:
+
+```env
+SERPAPI_API_KEY=your_serpapi_api_key
+```
+
+SerpApi is a meaningful part of the lawyer workflow, providing external legal research alongside NyayaVault's internal case and document management.
+
+
 ## Key Features
 
 ### 🔐 Role-Based Access Control
