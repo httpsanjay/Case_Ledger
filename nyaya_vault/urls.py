@@ -26,6 +26,7 @@ urlpatterns = [
     path("", include('accounts.urls')),
     path('cases/', include('cases.urls')),
     path('audit/', include('audit.urls')),
+    path('lawyer/', include('lawyer_search.urls')),
     path("internal/mcp/",include("cases.mcp_urls"),
 ),
 

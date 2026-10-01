@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'accounts',
     'cases',
     'audit',
+    'lawyer_search',
 ]
 
 MIDDLEWARE = [
