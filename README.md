@@ -1,4 +1,4 @@
-# NyayaVault
+# CaseLedger
 
 ### Secure Digital Document Management System for Legal & Investigation Documents
 
@@ -9,7 +9,7 @@
 [![REST API](https://img.shields.io/badge/API-Django%20REST%20Framework-A30000?style=for-the-badge)](https://www.django-rest-framework.org/)
 [![License](https://img.shields.io/badge/License-Educational-blue?style=for-the-badge)](#license)
 
-**NyayaVault** is a secure web-based document management system designed for storing, managing, reviewing, and tracking legal and investigation documents.
+**CaseLedger** is a secure web-based document management system designed for storing, managing, reviewing, and tracking legal and investigation documents.
 
 The system connects documents with cases and authorized officers while maintaining document versions, audit records, file integrity, and digital signatures.
 
@@ -29,7 +29,7 @@ Legal and investigation teams handle documents such as:
 
 Managing these documents manually can make it difficult to track versions, verify file integrity, control access, and identify who approved a document.
 
-**NyayaVault** provides a centralized system where documents are linked to cases and access is controlled based on the user's role and permissions.
+**CaseLedger** provides a centralized system where documents are linked to cases and access is controlled based on the user's role and permissions.
 
 ---
 
@@ -38,7 +38,11 @@ Managing these documents manually can make it difficult to track versions, verif
 
 # 🔎 SerpApi Integration
 
-NyayaVault integrates **SerpApi** to provide external legal research for authorized lawyers.
+<<<<<<< HEAD
+CaseLedger integrates **SerpApi** to provide external legal research for authorized lawyers.
+=======
+CaseLedger integrates **SerpApi** to provide external legal research for authorized lawyers.
+>>>>>>> 66451b5 (Changed Name)
 
 Lawyers can search for:
 
@@ -52,7 +56,11 @@ Lawyers can search for:
 ```text
 Lawyer
   ↓
-NyayaVault Legal Search
+<<<<<<< HEAD
+CaseLedger Legal Search
+=======
+CaseLedger Legal Search
+>>>>>>> 66451b5 (Changed Name)
   ↓
 SerpApi
   ↓
@@ -61,7 +69,11 @@ Google India
 Search Results
 ```
 
-Search results including the **title, source, URL, and snippet** are displayed directly inside NyayaVault.
+<<<<<<< HEAD
+Search results including the **title, source, URL, and snippet** are displayed directly inside CaseLedger.
+=======
+Search results including the **title, source, URL, and snippet** are displayed directly inside CaseLedger.
+>>>>>>> 66451b5 (Changed Name)
 
 ### Implementation
 
@@ -83,7 +95,11 @@ The SerpApi key is securely stored using an environment variable:
 SERPAPI_API_KEY=your_serpapi_api_key
 ```
 
-SerpApi is a meaningful part of the lawyer workflow, providing external legal research alongside NyayaVault's internal case and document management.
+<<<<<<< HEAD
+SerpApi is a meaningful part of the lawyer workflow, providing external legal research alongside CaseLedger's internal case and document management.
+=======
+SerpApi is a meaningful part of the lawyer workflow, providing external legal research alongside CaseLedger's internal case and document management.
+>>>>>>> 66451b5 (Changed Name)
 
 
 ## Key Features
@@ -128,7 +144,7 @@ This makes it easier to find and manage all documents related to a particular in
 
 ### 📝 Document Versioning
 
-NyayaVault keeps track of different versions of documents.
+CaseLedger keeps track of different versions of documents.
 
 Instead of replacing the original document, a new version can be created.
 
@@ -138,7 +154,7 @@ This helps maintain a history of document changes and supports investigation tra
 
 ### 🔏 Digital Signatures
 
-NyayaVault supports digital signing of approved documents.
+CaseLedger supports digital signing of approved documents.
 
 The current signing workflow is designed around an **IO → SHO** approval process.
 
@@ -193,7 +209,7 @@ This provides a way to detect byte-level changes to a document.
 
 ### 🔍 Document Search
 
-NyayaVault includes document and case search functionality.
+CaseLedger includes document and case search functionality.
 
 The system can search using information such as:
 
@@ -211,7 +227,7 @@ Semantic search functionality can also use document embeddings to retrieve relev
 
 Scanned documents and images may not contain selectable text.
 
-NyayaVault can process supported documents using OCR to extract text.
+CaseLedger can process supported documents using OCR to extract text.
 
 The extracted text can then be used for:
 
@@ -325,7 +341,7 @@ The audit trail helps provide visibility into how documents are handled.
 
 ## Document Security Model
 
-NyayaVault uses multiple layers to protect document integrity.
+CaseLedger uses multiple layers to protect document integrity.
 
 ### 1. Access Control
 
@@ -386,7 +402,7 @@ The signature is associated with the approved document version.
 ## Project Structure
 
 ```text
-nyaya_vault/
+case_ledger/
 │
 ├── accounts/
 │   ├── models.py
@@ -404,7 +420,7 @@ nyaya_vault/
 │   ├── models.py
 │   └── ...
 │
-├── nyaya_vault/
+├── case_ledger/
 │   ├── settings.py
 │   ├── urls.py
 │   └── ...
@@ -502,7 +518,7 @@ http://127.0.0.1:8000/
 
 ## API
 
-NyayaVault uses Django REST Framework for API-based operations.
+CaseLedger uses Django REST Framework for API-based operations.
 
 The API can be used for application features such as:
 
@@ -519,7 +535,7 @@ API documentation can be exposed through the project's configured API documentat
 
 ## AI and Semantic Search
 
-NyayaVault is designed to support AI-assisted document retrieval and analysis.
+CaseLedger is designed to support AI-assisted document retrieval and analysis.
 
 The semantic search pipeline can use:
 
@@ -559,7 +575,7 @@ AI features should only operate on information that the authenticated user is au
 
 ## MCP Integration
 
-NyayaVault is also being extended with **Model Context Protocol (MCP)** integration.
+CaseLedger is also being extended with **Model Context Protocol (MCP)** integration.
 
 The goal is to provide controlled access to application capabilities through defined MCP tools and prompts.
 
@@ -580,7 +596,7 @@ MCP
  └── Authorized Retrieval
         │
         ▼
-    NyayaVault
+    CaseLedger
 ```
 
 MCP access must respect the application's existing authentication and authorization rules.
@@ -634,7 +650,7 @@ Authorized court users can access documents made available for the relevant case
 
 ## SDG Alignment
 
-NyayaVault is related to:
+CaseLedger is related to:
 
 ### UN Sustainable Development Goal 16
 
@@ -667,7 +683,7 @@ Planned improvements include:
 
 ## Current Status
 
-**NyayaVault is an academic project / prototype under active development.**
+**CaseLedger is an academic project / prototype under active development.**
 
 The project demonstrates the architecture and implementation of secure digital document management concepts including:
 
@@ -745,7 +761,7 @@ CMR University
 ---
 
 <p align="center">
-  <strong>NyayaVault</strong><br>
+  <strong>CaseLedger</strong><br>
   Secure. Traceable. Case-Centric.
 </p>
 

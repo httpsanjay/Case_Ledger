@@ -1,5 +1,5 @@
 """
-URL configuration for nyaya_vault project.
+URL configuration for case_ledger project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/6.1/topics/http/urls/
@@ -26,7 +26,6 @@ urlpatterns = [
     path("", include('accounts.urls')),
     path('cases/', include('cases.urls')),
     path('audit/', include('audit.urls')),
-    path('lawyer/', include('lawyer_search.urls')),
     path("internal/mcp/",include("cases.mcp_urls"),
 ),
 

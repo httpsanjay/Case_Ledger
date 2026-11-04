@@ -1,5 +1,5 @@
 """
-ASGI config for nyaya_vault project.
+ASGI config for case_ledger project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 
@@ -11,6 +11,6 @@ import os
 
 from django.core.asgi import get_asgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nyaya_vault.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'case_ledger.settings')
 
 application = get_asgi_application()
