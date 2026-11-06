@@ -30,12 +30,10 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-SIGNING_KEY_ENCRYPTION_PASSWORD = os.environ.get(
-    "SIGNING_KEY_ENCRYPTION_PASSWORD"
-)
+SIGNING_KEY_ENCRYPTION_PASSWORD = os.environ.get("SIGNING_KEY_ENCRYPTION_PASSWORD")
 
 # Parse comma-separated string from .env, fallback to localhost if empty
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost').split(',')
 
 
 # Application definition
@@ -91,24 +89,15 @@ WSGI_APPLICATION = 'case_ledger.wsgi.application'
 # Toggle between SQLite and PostgreSQL based on environment variables
 
 
-if os.environ.get("USE_AWS_RDS") == "True":
- DATABASES = {
-     'default' : {
-         'ENGINE' : 'django.db.backends.postgresql',
-         'NAME' : os.environ.get('AWS_RDS_NAME'),
-         'USER' : os.environ.get('AWS_RDS_USER'),
-         'PASSWORD' : os.environ.get('AWS_RDS_PASSWORD'),
-         'HOST' : os.environ.get('AWS_RDS_HOST'),
-         'PORT' : os.environ.get('AWS_RDS_PORT'),
-     }
- }
-else:
- DATABASES = {
-     'default': {
-         'ENGINE': 'django.db.backends.sqlite3',
-         'NAME': BASE_DIR / 'db.sqlite3',
-     }
- }
+
+import dj_database_url
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL,conn_max_age=600,conn_health_checks=True)
+    }
 
 
 AUTH_USER_MODEL = "accounts.User"
@@ -137,7 +126,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
@@ -148,9 +137,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STORAGES = {
@@ -163,55 +150,45 @@ STORAGES = {
 }
 
 if not DEBUG:
-    # Tell Django to copy static assets into a path called `staticfiles` (this is specific to Render)
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-    # Enable the WhiteNoise storage backend, which compresses static files to reduce disk use
-    # and renames the files with unique names for each version to support long-term caching
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
-
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-
 MEDIA_URL = "/media/"
-MEDIA_ROOT = os.environ.get(
-    "MEDIA_ROOT",
-    str(BASE_DIR / "media")
-)
+MEDIA_ROOT = os.environ.get("MEDIA_ROOT",str(BASE_DIR / "media"))
 
-CELERY_BROKER_URL = os.environ.get(
-    "CELERY_BROKER_URL",
-    "redis://127.0.0.1:6379/0",
-)
-CELERY_RESULT_BACKEND = os.environ.get(
-    "CELERY_RESULT_BACKEND",
-    CELERY_BROKER_URL,
-)
-CELERY_TASK_TRACK_STARTED = True
+
+
+CELERY_BROKER_URL = os.environ["CELERY_BROKER_URL"]
+CELERY_RESULT_BACKEND = os.environ["CELERY_RESULT_BACKEND"]
+
 
 
 SESSION_COOKIE_AGE = int(os.environ.get('SESSION_COOKIE_AGE', 1209600))  
 SESSION_EXPIRE_AT_BROWSER_CLOSE = os.environ.get('SESSION_EXPIRE_AT_BROWSER_CLOSE', 'False') == 'True'
 
+#Set up HSTS
+if DEBUG == False:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 3600
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'same-origin'
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-SECURE_SSL_REDIRECT = not DEBUG
 
-SESSION_COOKIE_SECURE = not DEBUG
-
-CSRF_COOKIE_SECURE = not DEBUG
-
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 CSRF_TRUSTED_ORIGINS = []
 
 if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
-    CSRF_TRUSTED_ORIGINS.append(
-        f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}"
-    )
+    CSRF_TRUSTED_ORIGINS.append(f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}")
 
-# SECURE_HSTS_SECONDS = 31536000  
-# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-# SECURE_HSTS_PRELOAD = True
+

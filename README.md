@@ -444,8 +444,8 @@ case_ledger/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/httpsanjay/nyaya-vault.git
-cd nyaya-vault
+git clone https://github.com/httpsanjay/case-ledger.git
+cd case-ledger
 ```
 
 > Replace the repository URL with the actual repository URL if the repository name is different.
