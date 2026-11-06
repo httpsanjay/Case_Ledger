@@ -137,15 +137,15 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
@@ -157,11 +157,14 @@ if not DEBUG:
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.environ.get("MEDIA_ROOT",str(BASE_DIR / "media"))
 
-import os
-
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL")
-
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND")
+
+if not CELERY_BROKER_URL:
+    raise RuntimeError("CELERY_BROKER_URL is missing")
+
+if not CELERY_RESULT_BACKEND:
+    raise RuntimeError("CELERY_RESULT_BACKEND is missing")
 
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
@@ -170,6 +173,7 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TIMEZONE = "Asia/Kolkata"
+CELERY_ENABLE_UTC = True
 
 SESSION_COOKIE_AGE = int(os.environ.get('SESSION_COOKIE_AGE', 1209600))  
 SESSION_EXPIRE_AT_BROWSER_CLOSE = os.environ.get('SESSION_EXPIRE_AT_BROWSER_CLOSE', 'False') == 'True'
