@@ -7,13 +7,14 @@ from celery import shared_task
 
 from .models import DocumentVersion
 from .ocr import extract_text
-
+from django.db import close_old_connections
 
 logger = logging.getLogger(__name__)
 
 
 @shared_task
 def extract_document_text(document_version_id):
+    close_old_connections()
     try:
         version = DocumentVersion.objects.get(pk=document_version_id)
         version.ocr_status = DocumentVersion.OCR_PROCESSING
@@ -80,3 +81,5 @@ def extract_document_text(document_version_id):
             ocr_error=str(exc),
         )
         raise
+    finally:
+        close_old_connections()

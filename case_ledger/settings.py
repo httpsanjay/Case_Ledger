@@ -90,27 +90,51 @@ TEMPLATES = [
 WSGI_APPLICATION = "case_ledger.wsgi.application"
 
 
-# Database: Aiven PostgreSQL in production
+# Database: Aiven PostgreSQL
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if DATABASE_URL:
-    DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
-    }
-elif os.getenv("RENDER"):
-    raise RuntimeError("DATABASE_URL is missing on Render")
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is missing")
 
+DATABASES = {
+    "default": dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=0,  # For ASGI deployment
+        conn_health_checks=True,
+        engine="django.db.backends.postgresql",
+        options={
+            "connect_timeout": 10,
+            "sslmode": "require",
+        },
+    )
+}
+
+
+# Celery + Redis
+CELERY_BROKER_URL = (
+    os.getenv("CELERY_BROKER_URL")
+    or os.getenv("REDIS_URL")
+)
+
+CELERY_RESULT_BACKEND = (
+    os.getenv("CELERY_RESULT_BACKEND")
+    or CELERY_BROKER_URL
+)
+
+if not CELERY_BROKER_URL:
+    raise RuntimeError("CELERY_BROKER_URL or REDIS_URL is missing")
+
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_TRACK_STARTED = True
+
+CELERY_TIMEZONE = "Asia/Kolkata"
+CELERY_ENABLE_UTC = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -167,29 +191,7 @@ MEDIA_ROOT = Path(
 )
 
 
-# Celery + Redis
-CELERY_BROKER_URL = (
-    os.getenv("CELERY_BROKER_URL")
-    or os.getenv("REDIS_URL")
-)
 
-CELERY_RESULT_BACKEND = (
-    os.getenv("CELERY_RESULT_BACKEND")
-    or CELERY_BROKER_URL
-)
-
-if not CELERY_BROKER_URL:
-    raise RuntimeError("CELERY_BROKER_URL or REDIS_URL is missing")
-
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-CELERY_TASK_TRACK_STARTED = True
-
-CELERY_TIMEZONE = "Asia/Kolkata"
-CELERY_ENABLE_UTC = True
 
 
 # Sessions
@@ -197,18 +199,14 @@ SESSION_COOKIE_AGE = int(
     os.getenv("SESSION_COOKIE_AGE", "1209600")
 )
 
-SESSION_EXPIRE_AT_BROWSER_CLOSE = (
-    os.getenv("SESSION_EXPIRE_AT_BROWSER_CLOSE", "False").lower()
-    == "true"
-)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = (os.getenv("SESSION_EXPIRE_AT_BROWSER_CLOSE", "False").lower()== "true")
 
 
 # Security
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
-        "CSRF_TRUSTED_ORIGINS", ""
-    ).split(",")
+        "CSRF_TRUSTED_ORIGINS", "").split(",")
     if origin.strip()
 ]
 
