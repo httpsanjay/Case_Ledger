@@ -99,14 +99,15 @@ if not DATABASE_URL:
 DATABASES = {
     "default": dj_database_url.parse(
         DATABASE_URL,
-        conn_max_age=0,  # For ASGI deployment
+        conn_max_age=0,
         conn_health_checks=True,
         engine="django.db.backends.postgresql",
-        options={
-            "connect_timeout": 10,
-            "sslmode": "require",
-        },
     )
+}
+
+DATABASES["default"]["OPTIONS"] = {
+    "connect_timeout": 10,
+    "sslmode": "require",
 }
 
 
