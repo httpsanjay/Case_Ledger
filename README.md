@@ -733,27 +733,9 @@ git push origin feature/your-feature
 
 ---
 
-## License
-
-This project is intended for **educational and academic purposes**.
-
-Add an appropriate open-source license to the repository if you decide to distribute the project under one.
-
----
-
 ## Author
 
 **Sri Sanjay K**
-
-B.Tech Computer Science Engineering
-CMR University
-
-**Vinutha NJ**
-
-B.Tech Computer Science Engineering
-CMR University
-
-**Yashaswini DN**
 
 B.Tech Computer Science Engineering
 CMR University
