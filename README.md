@@ -1,752 +1,346 @@
-# CaseLedger
+# CaseLedger - Secure Document Management System
 
-### Secure Digital Document Management System for Legal & Investigation Documents
+**A secure document management system for police and legal case files.**
 
-[![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=for-the-badge\&logo=python\&logoColor=white)](https://www.python.org/)
-[![Django](https://img.shields.io/badge/Django-6.x-092E20?style=for-the-badge\&logo=django\&logoColor=white)](https://www.djangoproject.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?style=for-the-badge\&logo=postgresql\&logoColor=white)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-Queue%20%26%20Cache-DC382D?style=for-the-badge\&logo=redis\&logoColor=white)](https://redis.io/)
-[![REST API](https://img.shields.io/badge/API-Django%20REST%20Framework-A30000?style=for-the-badge)](https://www.django-rest-framework.org/)
-[![License](https://img.shields.io/badge/License-Educational-blue?style=for-the-badge)](#license)
+CaseLedger helps investigation teams store case documents, track every version, get them approved, sign them digitally, and prove later that nothing was changed.
 
-**CaseLedger** is a secure web-based document management system designed for storing, managing, reviewing, and tracking legal and investigation documents.
-
-The system connects documents with cases and authorized officers while maintaining document versions, audit records, file integrity, and digital signatures.
+![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=flat&logo=python&logoColor=white)
+![Django](https://img.shields.io/badge/Django-6.x-092E20?style=flat&logo=django&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?style=flat&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Queue-DC382D?style=flat&logo=redis&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Academic%20Prototype-orange?style=flat)
 
 ---
 
-## Overview
+## Table of Contents
 
-Legal and investigation teams handle documents such as:
-
-* FIRs
-* Investigation reports
-* Witness statements
-* Charge sheets
-* Evidence records
-* Forensic reports
-* Case-related documents
-
-Managing these documents manually can make it difficult to track versions, verify file integrity, control access, and identify who approved a document.
-
-**CaseLedger** provides a centralized system where documents are linked to cases and access is controlled based on the user's role and permissions.
+1. [The Problem](#the-problem)
+2. [What CaseLedger Does](#what-caseledger-does)
+3. [User Roles](#user-roles)
+4. [How a Document Moves Through the System](#how-a-document-moves-through-the-system)
+5. [Security Design](#security-design)
+6. [Tech Stack](#tech-stack)
+7. [Project Structure](#project-structure)
+8. [Getting Started](#getting-started)
+9. [Environment Variables](#environment-variables)
+10. [Deployment](#deployment)
+11. [Limitations](#limitations)
+12. [Future Work](#future-work)
+13. [Authors](#authors)
 
 ---
 
+## The Problem
 
+Police and legal teams handle many important documents: FIRs, witness statements, forensic reports, charge sheets and more. When these are managed by hand, it is hard to:
 
+- find the latest version of a document,
+- control who can see a case,
+- prove that a file was not changed after approval,
+- know who approved a document, and when.
 
-# 🔎 SerpApi Integration
+CaseLedger solves this by keeping every document inside a **case**, controlling access by **role and police station**, and recording every important action.
 
-<<<<<<< HEAD
-CaseLedger integrates **SerpApi** to provide external legal research for authorized lawyers.
-=======
-CaseLedger integrates **SerpApi** to provide external legal research for authorized lawyers.
->>>>>>> 66451b5 (Changed Name)
+---
 
-Lawyers can search for:
+## What CaseLedger Does
 
-* Court judgments
-* Legal cases
-* Laws and regulations
-* Legal precedents
+### Case and document management
+- Create cases with a case number, type, status and description.
+- Add documents to a case (FIR, Witness Statement, Evidence, Investigation Report, Charge Sheet, Forensic Report, Court Filing, Other).
+- Assign officers to a case.
+- Search and filter cases by number, title, status, type or assigned officer.
+- Download selected case documents as a ZIP file.
 
-### How it works
+### Document versioning
+- Every upload creates a new **version**. Old versions are never overwritten.
+- A signed version cannot be replaced.
+
+### Review and approval
+- An Investigating Officer (IO) submits a document for review.
+- A Station House Officer (SHO) approves or rejects it. A rejection can include a reason.
+
+### Digital signatures
+- Only an SHO can sign, and only after approving the document.
+- Each SHO gets their own RSA-4096 key pair.
+- The signature covers the document ID, version number, file hash and SHO ID.
+
+### Integrity checking
+- A SHA-256 hash is calculated for every uploaded file and stored.
+- Anyone with access can run **Verify** on a version. The system recalculates the hash and checks the signature, then reports whether the file is unchanged.
+
+### OCR and text extraction
+- Scanned PDFs and images are processed with OCR (Tesseract).
+- OCR runs in the background (Celery + Redis), so uploads stay fast.
+- The status of each file is tracked: Pending, Processing, Completed or Failed.
+- The extracted text is saved with the document version.
+
+### Secure sharing
+An SHO can share specific document versions with:
+- another **police station**,
+- a **lawyer** (found by registration number),
+- a **court** account (found by registration number).
+
+Each share has a permission level (**View**, **Download**, or **View + Download**), can have an expiry date, and can be revoked at any time. Recipients see shared documents under **Shared With Me**.
+
+### Audit trail
+Important actions are saved with the user, time and IP address, including:
+logins, case creation, uploads, submissions, approvals, rejections, signing, verification, sharing, revoking, and shared-document views and downloads.
+
+### Internal MCP endpoints
+CaseLedger includes read-only internal JSON endpoints (under `/internal/mcp/`) for case search, document search, case details and OCR text. They are protected by a secret token and are meant for an external MCP or AI service to read data from CaseLedger.
+
+---
+
+## User Roles
+
+| Role | What they can do |
+| --- | --- |
+| **Administrator** | Full access to all cases. |
+| **Investigating Officer (IO)** | Create cases, upload documents and versions, and submit documents for review. Sees only cases they created or are assigned to. |
+| **Station House Officer (SHO)** | Sees all cases in their station. Approves or rejects documents, signs documents, assigns officers and shares documents. |
+| **Forensic Officer** | Works on assigned cases in their station. |
+| **Lawyer** | Views or downloads only the documents shared with them. |
+| **Court Official** | Views or downloads only the documents shared with them. |
+
+Access is also limited by **police station**. An officer cannot open a case from another station unless a document has been shared with them.
+
+---
+
+## How a Document Moves Through the System
 
 ```text
-Lawyer
-  ↓
-<<<<<<< HEAD
-CaseLedger Legal Search
-=======
-CaseLedger Legal Search
->>>>>>> 66451b5 (Changed Name)
-  ↓
-SerpApi
-  ↓
-Google India
-  ↓
-Search Results
+IO uploads document  ->  Version saved (status: DRAFT)
+                              |
+                              |  SHA-256 hash created
+                              |  OCR queued in background
+                              v
+IO submits for review  ->  PENDING_REVIEW
+                              |
+                 +------------+------------+
+                 |                         |
+            SHO rejects               SHO approves
+                 |                         |
+              REJECTED                  APPROVED
+        (IO uploads a new version)         |
+                                     SHO signs
+                                           |
+                                        SIGNED
+                                (file can no longer be changed)
 ```
 
-<<<<<<< HEAD
-Search results including the **title, source, URL, and snippet** are displayed directly inside CaseLedger.
-=======
-Search results including the **title, source, URL, and snippet** are displayed directly inside CaseLedger.
->>>>>>> 66451b5 (Changed Name)
-
-### Implementation
-
-```python
-result = client.search({
-    "q": search_query,
-    "location": "India",
-    "hl": "en",
-    "gl": "in",
-    "google_domain": "google.co.in",
-})
-
-results = result.get("organic_results", [])
-```
-
-The SerpApi key is securely stored using an environment variable:
-
-```env
-SERPAPI_API_KEY=your_serpapi_api_key
-```
-
-<<<<<<< HEAD
-SerpApi is a meaningful part of the lawyer workflow, providing external legal research alongside CaseLedger's internal case and document management.
-=======
-SerpApi is a meaningful part of the lawyer workflow, providing external legal research alongside CaseLedger's internal case and document management.
->>>>>>> 66451b5 (Changed Name)
-
-
-## Key Features
-
-### 🔐 Role-Based Access Control
-
-Different users have different responsibilities within the system.
-
-Supported roles include:
-
-* **Investigation Officer (IO)**
-* **Station House Officer (SHO)**
-* **Forensic Officer**
-* **Lawyer**
-* **Court**
-
-Access to cases and documents can be restricted according to the user's role and assigned permissions.
+Document version statuses: `DRAFT`, `PENDING_REVIEW`, `REJECTED`, `APPROVED`, `SIGNED`.
 
 ---
 
-### 📁 Case-Based Document Management
+## Security Design
 
-Documents are organized around cases instead of being stored as isolated files.
-
-Each case can contain multiple documents and document versions.
-
-Example:
-
-```text
-Case
- ├── FIR
- ├── Investigation Report
- ├── Witness Statement
- ├── Evidence Document
- ├── Forensic Report
- └── Charge Sheet
-```
-
-This makes it easier to find and manage all documents related to a particular investigation.
+| Layer | How it works |
+| --- | --- |
+| **Role-based access** | Every view checks the user's role and police station. |
+| **File hashing** | SHA-256 hash stored for each version; any change to the file is detected. |
+| **Digital signature** | RSA-4096 with PSS padding and SHA-256, created by the SHO. |
+| **Protected private keys** | Private keys are stored encrypted, using `SIGNING_KEY_ENCRYPTION_PASSWORD`. |
+| **Immutable signed files** | A signed version cannot have its file replaced. |
+| **Audit log** | Actions are recorded with user, time and IP address. |
+| **Share controls** | Shares have permissions, optional expiry and can be revoked. |
+| **Production settings** | When `DEBUG=False`: HTTPS redirect, HSTS, secure cookies, `X-Frame-Options: DENY` and nosniff headers. |
+| **MCP endpoints** | Require a secret token and are compared in constant time. |
 
 ---
 
-### 📝 Document Versioning
-
-CaseLedger keeps track of different versions of documents.
-
-Instead of replacing the original document, a new version can be created.
-
-This helps maintain a history of document changes and supports investigation traceability.
-
----
-
-### 🔏 Digital Signatures
-
-CaseLedger supports digital signing of approved documents.
-
-The current signing workflow is designed around an **IO → SHO** approval process.
-
-```text
-Investigation Officer
-        │
-        │ Upload Document
-        ▼
-     Document
-        │
-        ▼
-   SHO Review
-        │
-        │ Approve
-        ▼
-   Digital Signature
-        │
-        ▼
-   Signed Document
-```
-
-The system uses:
-
-* **RSA 4096-bit keys** for digital signatures
-* **SHA-256** for document hashing
-
-The hash helps detect changes to the file, while the digital signature provides cryptographic evidence that the document was signed using the corresponding signing key.
-
----
-
-### 🧾 File Integrity
-
-Each document version can have a cryptographic hash.
-
-Example:
-
-```text
-Original File
-     │
-     ▼
- SHA-256 Hash
-     │
-     ▼
-Stored with Document Version
-```
-
-If the file is modified later, its calculated hash will differ from the stored hash.
-
-This provides a way to detect byte-level changes to a document.
-
----
-
-### 🔍 Document Search
-
-CaseLedger includes document and case search functionality.
-
-The system can search using information such as:
-
-* Case ID
-* Document name
-* Document description
-* Extracted document text
-* Relevant keywords
-
-Semantic search functionality can also use document embeddings to retrieve relevant content based on meaning rather than only exact keyword matches.
-
----
-
-### 📄 OCR Support
-
-Scanned documents and images may not contain selectable text.
-
-CaseLedger can process supported documents using OCR to extract text.
-
-The extracted text can then be used for:
-
-* Search
-* Document analysis
-* Future semantic retrieval
-* AI-assisted features
-
-OCR processing is handled asynchronously using a task queue.
-
----
-
-### ⚡ Background Processing
-
-Redis is used to support background processing for tasks such as document text extraction.
-
-```text
-User Upload
-     │
-     ▼
-Django
-     │
-     ▼
-Task Queue
-     │
-     ▼
-Redis
-     │
-     ▼
-Background Worker
-     │
-     ▼
-OCR / Text Extraction
-```
-
-This prevents heavy document-processing operations from blocking the main web request.
-
----
-
-### 📋 Audit Trail
-
-Important actions can be recorded in the system to provide a history of activity.
-
-Examples include:
-
-* Document uploads
-* Document changes
-* Reviews
-* Approvals
-* Digital signing
-* Access-related actions
-
-The audit trail helps provide visibility into how documents are handled.
-
----
-
-## Technology Stack
-
-| Technology                  | Purpose                   |
-| --------------------------- | ------------------------- |
-| **Python**                  | Backend programming       |
-| **Django**                  | Web application framework |
-| **Django REST Framework**   | REST API                  |
-| **PostgreSQL**              | Database                  |
-| **Celery**                  | Background processing     |
-| **HTML / CSS / JavaScript** | Frontend                  |
-| **SHA-256**                 | File integrity hashing    |
-| **RSA 4096**                | Digital signatures        |
-| **OCR**                     | Text extraction           |
-| **Sentence Transformers**   | Semantic embeddings       |
-| **FastMCP**                 | MCP Integration           |
-| **Git**                     | Version control           |
-
----
-
-## System Architecture
-
-```text
-                         ┌──────────────────────┐
-                         │       Browser        │
-                         │   Web Application     │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │       Django         │
-                         │    Application       │
-                         └───────┬───────┬──────┘
-                                 │       │
-                 ┌───────────────┘       └───────────────┐
-                 ▼                                       ▼
-       ┌──────────────────┐                    ┌──────────────────┐
-       │   PostgreSQL     │                    │      Redis       │
-       │     Database     │                    │ Queue / Cache    │
-       └──────────────────┘                    └────────┬─────────┘
-                                                        │
-                                                        ▼
-                                              ┌──────────────────┐
-                                              │ Background Tasks │
-                                              │ OCR / Processing │
-                                              └──────────────────┘
-
-                         ┌──────────────────────┐
-                         │ Document Processing  │
-                         │ Hash / Signature /   │
-                         │ Text Extraction      │
-                         └──────────────────────┘
-```
-
----
-
-## Document Security Model
-
-CaseLedger uses multiple layers to protect document integrity.
-
-### 1. Access Control
-
-Users are given permissions based on their roles and assignments.
-
-### 2. File Hashing
-
-SHA-256 is used to generate a cryptographic fingerprint of a document.
-
-### 3. Digital Signature
-
-Approved documents can be digitally signed using RSA-based cryptography.
-
-### 4. Audit Records
-
-Important document operations can be recorded for traceability.
-
-### 5. HTTPS
-
-When deployed with HTTPS, TLS protects communication between the user's browser and the application during transmission.
-
-> Digital signatures and hashing help verify document integrity and authenticity. HTTPS protects the communication channel while data is being transmitted.
-
----
-
-## Digital Signature Workflow
-
-The signing process is designed to prevent unauthorized signing.
-
-```text
-IO uploads document
-        │
-        ▼
-Document stored
-        │
-        ▼
-SHO reviews document
-        │
-        ├── Reject ──► Document returned for changes
-        │
-        ▼
-     Approve
-        │
-        ▼
-SHO signs document
-        │
-        ▼
-SHA-256 hash + RSA signature
-        │
-        ▼
-Signed document version
-```
-
-The signature is associated with the approved document version.
+## Tech Stack
+
+| Area | Technology |
+| --- | --- |
+| Backend | Python, Django |
+| Database | PostgreSQL |
+| Background tasks | Celery with Redis |
+| OCR | Tesseract (`pytesseract`), `pdf2image`, Pillow |
+| Cryptography | `cryptography` library (RSA-4096, SHA-256) |
+| Filtering | `django-filter` |
+| Static files | WhiteNoise |
+| Server | Gunicorn with Uvicorn worker |
+| Frontend | Django templates, HTML, CSS, JavaScript |
+| Container | Docker |
 
 ---
 
 ## Project Structure
 
 ```text
-case_ledger/
-│
-├── accounts/
-│   ├── models.py
-│   ├── views.py
-│   ├── urls.py
-│   └── templates/
-│
-├── cases/
-│   ├── models.py
-│   ├── views.py
-│   ├── search.py
-│   └── urls.py
-│
-├── audit/
-│   ├── models.py
-│   └── ...
-│
-├── case_ledger/
-│   ├── settings.py
-│   ├── urls.py
-│   └── ...
-│
-├── static/
-│   ├── css/
-│   ├── js/
-│   └── images/
-│
-├── templates/
-│
-├── manage.py
+Case_Ledger/
+├── accounts/        Users, roles, login, registration, dashboard
+├── cases/           Cases, documents, versions, signing, sharing, OCR, MCP endpoints
+│   ├── models.py        Case, Document, DocumentVersion, DocumentShare, PoliceStation, UserSigningKey
+│   ├── views.py         Main application logic
+│   ├── permissions.py   Access rules
+│   ├── utils.py         Hashing, key generation, signing and verification
+│   ├── tasks.py         Celery task for OCR
+│   ├── ocr.py           Text extraction
+│   ├── filters.py       Case search and filters
+│   ├── mcp_views.py     Internal read-only endpoints
+│   └── management/commands/seed_police_stations.py
+├── audit/           Audit log model, helper and page
+├── case_ledger/     Project settings, URLs, Celery setup
+├── templates/       Shared layouts and components
+├── static/          CSS
+├── Dockerfile
+├── build.sh
 ├── requirements.txt
-└── README.md
+└── manage.py
 ```
 
 ---
 
-## Installation
+## Getting Started
 
-### 1. Clone the Repository
+### Requirements
+
+- Python 3.14 (or a compatible version)
+- PostgreSQL database
+- Redis server
+- **Tesseract OCR** and **Poppler** installed on the system (needed for OCR)
+
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/httpsanjay/case-ledger.git
-cd case-ledger
+git clone https://github.com/httpsanjay/Case_Ledger.git
+cd Case_Ledger
 ```
 
-> Replace the repository URL with the actual repository URL if the repository name is different.
-
-### 2. Create a Virtual Environment
-
-Windows:
+### 2. Create a virtual environment
 
 ```bash
 python -m venv venv
+
+# Windows
 venv\Scripts\activate
-```
 
-Linux / macOS:
-
-```bash
-python3 -m venv venv
+# Linux / macOS
 source venv/bin/activate
 ```
 
-### 3. Install Dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
+### 4. Create a `.env` file
 
-Create a `.env` file.
+Copy the values from the [Environment Variables](#environment-variables) section and fill in your own.
 
-Example:
-
-```env
-SECRET_KEY=DJANGO_SECRET_KEY
-DEBUG=True or False
-ALLOWED_HOSTS=localhost,127.0.0.1,*.localhost
-SESSION_COOKIE_AGE=7200
-SESSION_EXPIRE_AT_BROWSER_CLOSE=True or False
-SIGNING_KEY_ENCRYPTION_PASSWORD=test-signing-password
-MCP_AUTH_TOKEN=MCP_TOKEN
-MCP_HOST=0.0.0.0
-MCP_PORT=8001
-```
-
-### 5. Run Migrations
+### 5. Set up the database
 
 ```bash
 python manage.py migrate
-```
-
-### 6. Create an Administrator
-
-```bash
+python manage.py seed_police_stations
 python manage.py createsuperuser
 ```
 
-### 7. Start the Development Server
+`seed_police_stations` adds sample Bengaluru police stations so you can start testing.
+
+### 6. Start the web server
 
 ```bash
 python manage.py runserver
 ```
 
-The application will normally be available at:
+Open `http://127.0.0.1:8000/`.
 
-```text
-http://127.0.0.1:8000/
-```
+### 7. Start the background worker
 
----
-
-## API
-
-CaseLedger uses Django REST Framework for API-based operations.
-
-The API can be used for application features such as:
-
-* Authentication
-* Case management
-* Document management
-* Document versions
-* Search
-* Case-related operations
-
-API documentation can be exposed through the project's configured API documentation system.
-
----
-
-## AI and Semantic Search
-
-CaseLedger is designed to support AI-assisted document retrieval and analysis.
-
-The semantic search pipeline can use:
-
-```text
-Document
-    │
-    ▼
-Text Extraction
-    │
-    ▼
-Text Chunking
-    │
-    ▼
-Embeddings
-    │
-    ▼
-Vector Search
-    │
-    ▼
-Relevant Documents
-```
-
-A future RAG architecture can build on this retrieval layer.
-
-### Planned AI Capabilities
-
-* Case summarization
-* Relevant document retrieval
-* Question answering over authorized case documents
-* Identification of missing information
-* Contradiction detection
-* Investigation document analysis
-
-AI features should only operate on information that the authenticated user is authorized to access.
-
----
-
-## MCP Integration
-
-CaseLedger is also being extended with **Model Context Protocol (MCP)** integration.
-
-The goal is to provide controlled access to application capabilities through defined MCP tools and prompts.
-
-Possible operations include:
-
-```text
-User
- │
- ▼
-AI Application
- │
- ▼
-MCP
- │
- ├── Case Search
- ├── Document Search
- ├── Case Information
- └── Authorized Retrieval
-        │
-        ▼
-    CaseLedger
-```
-
-MCP access must respect the application's existing authentication and authorization rules.
-
----
-
-## Security Considerations
-
-This project is designed as a security-focused academic and development project.
-
-Important security areas include:
-
-* Role-based access control
-* Authentication
-* Authorization
-* File integrity verification
-* Digital signatures
-* Secure secret management
-* HTTPS/TLS in deployment
-* Audit logging
-* Controlled document access
-* Protection of private signing keys
-
-For a real production legal system, additional security controls, compliance requirements, infrastructure hardening, key management, monitoring, backups, disaster recovery, and formal security testing would be required.
-
----
-
-## Use Cases
-
-### Police / Investigation
-
-Investigating officers can manage documents related to assigned cases.
-
-### Senior Officers
-
-SHOs can review and approve documents submitted by authorized officers.
-
-### Forensic Teams
-
-Forensic reports and related documents can be associated with cases.
-
-### Legal Teams
-
-Authorized lawyers can access documents shared with them.
-
-### Courts
-
-Authorized court users can access documents made available for the relevant case.
-
----
-
-## SDG Alignment
-
-CaseLedger is related to:
-
-### UN Sustainable Development Goal 16
-
-**Peace, Justice and Strong Institutions**
-
-The project focuses on improving digital document management, traceability, controlled access, and information handling for legal and investigation workflows.
-
----
-
-## Future Improvements
-
-Planned improvements include:
-
-* Advanced RAG pipeline
-* Vector database integration
-* MCP-based AI workflows
-* Improved OCR processing
-* AI-assisted case summaries
-* Contradiction detection
-* Advanced audit analytics
-* Cloud object storage
-* Stronger key management
-* Document encryption at rest
-* Improved interoperability
-* Security testing and penetration testing
-* Production-grade monitoring
-* Backup and disaster recovery
-
----
-
-## Current Status
-
-**CaseLedger is an academic project / prototype under active development.**
-
-The project demonstrates the architecture and implementation of secure digital document management concepts including:
-
-* Case management
-* Role-based access
-* Document versioning
-* OCR
-* Document hashing
-* Digital signatures
-* Audit tracking
-* Semantic search
-* Background processing
-* MCP integration
-
-It should **not** be considered a certified production system for handling real confidential legal or investigation data without additional security, compliance, and infrastructure work.
-
----
-
-## Contributing
-
-This project is currently developed primarily as an academic project.
-
-If you want to contribute:
-
-1. Fork the repository.
-2. Create a feature branch.
+In a second terminal (with the virtual environment active):
 
 ```bash
-git checkout -b feature/your-feature
+celery -A case_ledger worker --loglevel=info
 ```
 
-3. Make your changes.
-4. Test the changes.
-5. Commit your work.
+Without the worker, uploaded files will stay in the **Pending** OCR state.
+
+### 8. Run tests
 
 ```bash
-git commit -m "Add your feature"
+python manage.py test
 ```
-
-6. Push the branch.
-
-```bash
-git push origin feature/your-feature
-```
-
-7. Open a Pull Request.
 
 ---
 
-## Author
+## Environment Variables
 
-**Sri Sanjay K**
+```env
+# Required
+SECRET_KEY=your-django-secret-key
+DATABASE_URL=postgres://user:password@host:5432/dbname
+REDIS_URL=redis://localhost:6379/0
+SIGNING_KEY_ENCRYPTION_PASSWORD=a-long-random-password
 
-B.Tech Computer Science Engineering
-CMR University
+# General
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+CSRF_TRUSTED_ORIGINS=
+MEDIA_ROOT=media
+SESSION_COOKIE_AGE=1209600
+SESSION_EXPIRE_AT_BROWSER_CLOSE=False
+
+# Optional: internal MCP endpoints
+DJANGO_INTERNAL_TOKEN=a-long-random-token
+```
+
+Notes:
+
+- `DATABASE_URL` and `REDIS_URL` (or `CELERY_BROKER_URL`) are required. The app will not start without them.
+- `SECRET_KEY` is required when `DEBUG=False`.
+- Keep `SIGNING_KEY_ENCRYPTION_PASSWORD` safe. If it is lost, existing signing keys cannot be unlocked.
+- The database connection uses SSL (`sslmode=require`).
+- Never commit your `.env` file.
 
 ---
 
-<p align="center">
-  <strong>CaseLedger</strong><br>
-  Secure. Traceable. Case-Centric.
-</p>
+## Deployment
 
-<p align="center">
-  Built for secure digital document management in legal and investigation workflows.
-</p>
+The project includes:
+
+- **`Dockerfile`**: runs the app with Gunicorn and a Uvicorn worker on port `8000`.
+- **`build.sh`**: installs dependencies, collects static files and runs migrations (useful for platforms like Render).
+
+For production:
+
+1. Set `DEBUG=False` and a strong `SECRET_KEY`.
+2. Serve the app over HTTPS.
+3. Run a separate Celery worker process.
+4. Use persistent storage for uploaded files (`MEDIA_ROOT`).
+5. Install Tesseract and Poppler in the server or container image. The current `Dockerfile` does not install them yet.
+
+---
+
+## Limitations
+
+- This is an **academic prototype**. It is not certified for real confidential police or court data without more security review, compliance work and infrastructure hardening.
+- Uploaded files are stored on the local file system. They are not encrypted at rest.
+- The internal MCP endpoints use one shared token and are not filtered by individual user.
+- OCR quality depends on the quality of the scanned file.
+
+---
+
+## Future Work
+
+- Cloud object storage for files
+- Encryption of files at rest
+- Stronger key management (for example, a hardware security module or key vault)
+- Per-user access control on MCP endpoints
+- AI-assisted case summaries and document search
+- Better OCR handling
+- Security testing and monitoring
+- Backup and disaster recovery
+
+---
+
+## Authors
+
+- **Sri Sanjay K**: B.Tech Computer Science Engineering, CMR University
+- **Vinutha NJ**: B.Tech Computer Science Engineering, CMR University
+- **Yashaswini DN**: B.Tech Computer Science Engineering, CMR University
+
+---
